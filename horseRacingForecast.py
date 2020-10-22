@@ -40,3 +40,84 @@
 ・子と父と母のスコアを８：１：１の重みで平均したものを最終スコアとする。
 
 '''
+
+import requests
+from bs4 import BeautifulSoup
+import time
+import datetime
+import numpy as np
+from tqdm import tqdm
+
+def get_horse_url(url):
+    selector = '#umalink_' + url
+    url = 'https://db.netkeiba.com/race/' + url + '/'
+    res = requests.get(url)
+    soup = BeautifulSoup(res.content, 'html.parser')
+    horse_names = [n.get('href') for n in soup.select(selector)]
+    return horse_names
+
+def get_horse_data(url):
+    base_url = 'https://db.netkeiba.com'
+    res = requests.get(base_url + url)
+    soup = BeautifulSoup(res.content, 'html.parser')
+    race_name = soup.select('#contents > div.db_main_race.fc > div > table > tbody')
+    horse_name = soup.select('#db_main_box > div.db_head.fc > div.db_head_name.fc > div.horse_title > h1')
+    result = []
+    for n in race_name[0].contents:
+        try:
+            result.append([n.contents[1].get_text(), n.contents[9].get_text(), n.contents[13].get_text(), n.contents[23].get_text()])
+        except AttributeError:
+            pass
+    return [''.join(horse_name[0].get_text().split()), result]
+ 
+def calc_score(number_of_horse, order_of_arrival):
+    result = (1 - (order_of_arrival / number_of_horse)) * 100
+    return result
+
+def string_to_datetime(string):
+    return datetime.datetime.strptime(string, "%Y/%m/%d")
+
+if __name__ == "__main__":
+    score = []
+    for url in tqdm(get_horse_url('201708040711')):
+        #print('wait...')
+        time.sleep(1)#一応サーバーのために１秒待ってあげる
+        data = get_horse_data(url)
+        horse_name = data[0]
+        scores = []
+        wight = []
+        flag = 0
+        counter = 0
+        for i in range(1, len(data[1])):
+            if string_to_datetime(data[1][i][0]) < string_to_datetime('2017/10/22'):#レースの日
+                counter += 1
+                if counter == 1:
+                    if int(data[1][i][3]) > 4:
+                        break
+                try:
+                    scores.append(calc_score(int(data[1][i][2]), int(data[1][i][3])))
+                except ValueError:
+                    continue
+                if counter == 1:
+                    wight.append(2)
+                elif string_to_datetime(data[1][i][0]) > string_to_datetime('2020/4/22'):#レースの半年前
+                    wight.append(1.5)
+                else:
+                    wight.append(1)
+        try:
+            score.append([horse_name, np.average(scores, weights=wight)])
+        except ZeroDivisionError:
+            continue
+
+    score = sorted(score, reverse=True, key=lambda x: x[1]) 
+    for i in score:
+        print('馬名：　', end='')
+        print(i[0], end='')
+        print(' スコア：　', end='')
+        print(i[1])
+        
+                
+
+
+
+        
