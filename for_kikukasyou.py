@@ -1,24 +1,3 @@
-'''このプログラムについて
-【プログラムの概要】
-競馬の過去データから、レース結果を予想するプログラム。
-入力となるレースのURLはnetkeiba.comのものを使用すること。（例：https://db.netkeiba.com/race/xxxxxxxxxxxxx/）
-出力はレースの予想順。おそらく上位２〜３位を当てに行く賭け方が良さそう。
-賭け方の参考サイトはこちら：https://www.jra.go.jp/kouza/beginner/baken/
-
-【大まかな処理の流れ】
-１：レースのURLをコマンドラインから受け取る
-２：受け取ったURLの馬のリスト（馬の名前がデータへのリンクになっている）から、過去の戦歴をスクレイピングする
-３：集めたデータをもとに予想順位を算出する
-４：算出した予想順位を出力する
-
-【予想順位の決定方法】
-・スピード指標を計算して、その値が高い順に予想着順とする。
-・スピード指数＝(基準タイムー走破タイム)×距離指数＋馬場指数＋（斤量ー55）×2＋80
-・馬場指数は入手困難（有料）なので、とりあえず無視する（可算なのである程度無視しても大丈夫なはず）
-・距離指数＝#１秒÷基準タイム×1000
-・基準タイムはネットから引っ張ってきた
-'''
-
 import requests
 from bs4 import BeautifulSoup
 import time
@@ -27,17 +6,20 @@ import numpy as np
 from tqdm import tqdm
 import re
 
-def get_horse_url(url):
-    selector = '#umalink_' + url
-    url = 'https://db.netkeiba.com/race/' + url + '/'
+def get_horse_url():
+    url = "https://race.netkeiba.com/race/shutuba.html?race_id=202004040611"
     res = requests.get(url)
     soup = BeautifulSoup(res.content, 'html.parser')
-    horse_names = [n.get('href') for n in soup.select(selector)]
+    horse_names = []
+    for i in soup.find_all(class_='HorseName'):
+        try:
+            horse_names.append(i.contents[0].get('href'))
+        except AttributeError:
+            pass
     return horse_names
 
 def get_horse_data(url):
-    base_url = 'https://db.netkeiba.com'
-    res = requests.get(base_url + url)
+    res = requests.get(url)
     soup = BeautifulSoup(res.content, 'html.parser')
     race_name = soup.select('#contents > div.db_main_race.fc > div > table > tbody')
     horse_name = soup.select('#db_main_box > div.db_head.fc > div.db_head_name.fc > div.horse_title > h1')
@@ -89,7 +71,7 @@ if __name__ == "__main__":
     standard_index = {'東京': tokyo, '中山': nakayama, '京都': kyoto, '阪神': hanshin, '中京': cyukyo, '札幌': sapporo, '函館': hakodate, '福島': hukushima, '新潟':nigata, '小倉': kokura}
 
     result = []
-    for url in tqdm(get_horse_url('201804030411')):
+    for url in tqdm(get_horse_url()):
         time.sleep(1)#一応サーバーのために１秒待ってあげる
         horse_data = get_horse_data(url)
         #日付、開催地、レース名、頭数、着順、斤量、距離、タイム
@@ -107,7 +89,7 @@ if __name__ == "__main__":
             weight = data[5]
             distance = data[6]
             run_time = calc_time(data[7])
-            if string_to_datetime(date) < string_to_datetime('2018/10/21'):
+            if string_to_datetime(date) < string_to_datetime('2020/10/25'):
                 first_race_flag += 1
                 if first_race_flag == 1:
                     try:
@@ -131,10 +113,3 @@ if __name__ == "__main__":
     li = sorted(result, reverse=True, key=lambda x: x[1])
     for i in li:
         print(i[0] + ': ' + str(i[1]))
-        
-        
-                
-
-
-
-        
